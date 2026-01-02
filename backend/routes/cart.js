@@ -12,14 +12,33 @@ router.get("/", async (req, res) => {
 
   const session = await Session.findById(sid);
 
+  // 🔵 LOGGED-IN USER
   if (session.userId) {
     const cart = await Cart.findOne({ userId: session.userId })
       .populate("courses.courseId");
+
     return res.json(cart?.courses || []);
   }
 
-  return res.json(session.data.cart || []);
+  // 🟡 GUEST USER — POPULATE MANUALLY
+  const courseIds = session.data.cart.map((i) => i.courseId);
+
+  const courses = await Course.find({ _id: { $in: courseIds } });
+
+  const populatedGuestCart = session.data.cart.map((item) => {
+    const course = courses.find(
+      (c) => c._id.toString() === item.courseId.toString()
+    );
+
+    return {
+      courseId: course, // 🔥 same shape as logged-in cart
+      quantity: item.quantity,
+    };
+  });
+
+  return res.json(populatedGuestCart);
 });
+
 
 
 // Add to cart

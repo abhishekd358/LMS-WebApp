@@ -6,7 +6,7 @@ const CartContext = createContext(undefined);
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
 
-  // 🔹 Load cart (single source of truth)
+  //  Load cart (single source of truth)
   const loadCart = async () => {
     const { data } = await axiosInstance.get("/cart");
 
@@ -18,20 +18,20 @@ export function CartProvider({ children }) {
     setCart(formatted);
   };
 
-  // 🔹 Add item
+  //  Add item
   const addToCart = async (course) => {
     await axiosInstance.post("/cart", {
       courseId: course._id,
     });
 
-    await loadCart(); // 🔥 ONLY THIS
+    await loadCart(); //  ONLY THIS
   };
 
-  // 🔹 Remove item
+  //  Remove item
   const removeFromCart = async (course) => {
     await axiosInstance.delete(`/cart/${course._id}`);
 
-    await loadCart(); // 🔥 ONLY THIS
+    await loadCart(); // ONLY THIS
   };
 
   const cartCount = cart.reduce(
