@@ -8,7 +8,7 @@ const router = express.Router();
 // GET cart
 router.get("/", async (req, res) => {
   //  check is user has the guesId or not 
-   let guestId =  req.cookies.guestId;
+   let guestId =  req.signedCookies.guestId;
 
    if(!guestId){
     return res.json([])
@@ -29,7 +29,7 @@ router.post("/", async (req, res) => {
     const {courseId}= req.body // receive from froentedn
 
   //  check is user has the guesId or not 
-   let guestId =  req.cookies.guestId;
+   let guestId =  req.signedCookies.guestId;
 
   // 1️⃣ if guest id not present means we have to create new guest session
    if(!guestId){
@@ -42,6 +42,7 @@ router.post("/", async (req, res) => {
       httpOnly: true,
       maxAge:60 * 60 * 1000,
       sameSite: "lax",
+      signed: true
     })
   }
 
@@ -78,7 +79,7 @@ router.post("/", async (req, res) => {
 // Remove course from cart
 router.delete("/:courseId", async (req, res) => {
   // first we check is there present a guestid or not 
-  let guestId = req.cookies.guestId
+  let guestId = req.signedCookies.guestId
 
   //  take the coursId through params
   const {courseId} = req.params

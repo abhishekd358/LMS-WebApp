@@ -21,7 +21,7 @@ app.use(
   })
 );
 app.use(express.json());
-app.use(cookieParser())
+app.use(cookieParser("HFG543FHDeef5tF"))
 
 // Routes
 app.use("/courses", courseRoutes);
