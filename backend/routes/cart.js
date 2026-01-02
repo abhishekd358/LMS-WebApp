@@ -1,6 +1,7 @@
 import express from "express";
 import Session from "../models/Seesion.js";
 import Cart from "../models/Cart.js";
+import Course from "../models/Course.js";
 
 
 const router = express.Router();
