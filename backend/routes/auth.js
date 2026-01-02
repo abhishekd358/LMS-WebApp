@@ -106,4 +106,46 @@ router.post("/login", async (req, res) => {
 });
 
 
+// logout route
+router.delete("/logout", async (req, res) => {
+  try {
+    const sid = req.signedCookies.sid;
+
+    if (!sid) {
+      return res.status(400).json({
+        success: false,
+        message: "No active session",
+      });
+    }
+
+    const session = await Session.findById(sid);
+    if (!session) {
+      return res.status(400).json({
+        success: false,
+        message: "Session not found",
+      });
+    }
+
+    // 1️⃣ Detach user from session
+    session.userId = null;
+    session.data.cart = []; // optional (Amazon clears temp cart)
+    await session.save();
+
+    // 2️⃣ Remove auth token
+    res.clearCookie("token");
+    // keep sid cookie (important)
+
+    return res.json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
+});
+
 export default router;

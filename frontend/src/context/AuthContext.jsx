@@ -23,8 +23,11 @@ export function AuthProvider({ children }) {
     setUser(userData);
   };
 
-  const logout = () => {
-    setUser(null);
+  const logout = async() => {
+    const {data} = await axiosInstance.delete('/auth/logout')
+    setUser(null)
+    alert(data.message)
+
   };
 
   return (
