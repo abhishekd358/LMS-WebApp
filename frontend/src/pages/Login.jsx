@@ -1,11 +1,18 @@
 import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from 'react-router-dom'
 export default function Login() {
   const [email, setEmail] = useState("shubham@gmail.com");
   const [password, setPassword] = useState("shubham@123");
 
+  const navigate = useNavigate()
+  // context auth 
+  const {loginHandler} = useAuth()
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log({ email, password });
+    loginHandler(email, password)
+    navigate('/')
+    
   };
 
   return (

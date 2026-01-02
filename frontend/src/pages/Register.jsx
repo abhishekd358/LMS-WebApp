@@ -1,12 +1,21 @@
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import {useNavigate} from 'react-router-dom'
+
 export default function Register() {
   const [name, setName] = useState("Shubham Semwal");
   const [email, setEmail] = useState("shubham@gmail.com");
   const [password, setPassword] = useState("shubham@123");
+  const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  // using the registerHandler throughthe context
+  const {registerHandler}= useAuth()
+
+  const handleSubmit = async(e) => {
     e.preventDefault();
     console.log({ name, email, password });
+    await registerHandler(email, password, name)
+     navigate('/login')
   };
 
   return (
@@ -15,7 +24,7 @@ export default function Register() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
           Create an account
         </h1>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit } className="space-y-6">
           <div>
             <label
               htmlFor="name"

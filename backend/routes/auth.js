@@ -1,6 +1,8 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Session from "../models/Seesion.js";
+import Cart from "../models/Cart.js";
 
 const router = express.Router();
 
@@ -8,6 +10,11 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
   try {
     const { email, password, name } = req.body;
+    // console.log('from server', req.body)
+    // check this req body exists with required data
+    if(!email || !password || !name){
+      return res.json({message:"All field required", success: false})
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -21,24 +28,11 @@ router.post("/register", async (req, res) => {
       password,
       name,
     });
-
     await user.save();
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "24h" }
-    );
 
     res.status(201).json({
-      message: "User registered successfully",
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-      },
+      message: "User registered successfully",success:true
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -47,40 +41,69 @@ router.post("/register", async (req, res) => {
 
 // Login user
 router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "All fields required" });
+  }
 
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+  const user = await User.findOne({ email });
+  if (!user || !(await user.comparePassword(password))) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "24h" }
+  // 1️⃣ Load existing session (guest)
+  let session = req.signedCookies.sid
+    ? await Session.findById(req.signedCookies.sid)
+    : null;
+
+  if (!session) {
+    session = await Session.create({});
+  }
+
+  // 2️⃣ Attach user to session
+  session.userId = user._id;
+  await session.save();
+
+  // 3️⃣ Merge session cart → user cart
+  let cart = await Cart.findOne({ userId: user._id });
+  if (!cart) {
+    cart = await Cart.create({ userId: user._id, courses: [] });
+  }
+
+  for (const sItem of session.data.cart || []) {
+    const cItem = cart.courses.find(
+      i => i.courseId.toString() === sItem.courseId.toString()
     );
 
-    res.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    if (cItem) cItem.quantity += sItem.quantity;
+    else cart.courses.push(sItem);
   }
+
+  await cart.save();
+
+  // 4️⃣ Clear session cart
+  session.data.cart = [];
+  await session.save();
+
+  // 5️⃣ Set cookies
+  res.cookie("sid", session._id, {
+    httpOnly: true,
+    signed: true,
+    sameSite: "lax",
+  });
+
+  const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || "your-secret-key", {
+    expiresIn: "24h",
+  });
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+  });
+
+  res.json({ success: true, message: "Login successful" });
 });
+
 
 export default router;

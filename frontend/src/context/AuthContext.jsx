@@ -1,19 +1,25 @@
 import { createContext, useContext, useState } from "react";
+import axiosInstance from "../api/axiosInstance";
 
 const AuthContext = createContext(undefined);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState();
 
-  const login = (email, password) => {
+  const loginHandler = async(email, password) => {
     // In a real app, this would make an API call
-    const userData = { email, name: email.split("@")[0] };
+    const {data} = await axiosInstance.post('/auth/login', {email, password})
+    console.log(data.message)
+    const userData = { email, password };
     setUser(userData);
   };
 
-  const register = (email, password) => {
+  const registerHandler = async (email, password, name) => {
+    console.log('from registerHandlre', email, password, name)
     // In a real app, this would make an API call
-    const userData = { email, name: email.split("@")[0] };
+   const {data} = await axiosInstance.post('/auth/register', {email:email, password:password, name:name})
+    console.log(data.message)
+    const userData = { email, name, password};
     setUser(userData);
   };
 
@@ -22,7 +28,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loginHandler, registerHandler, logout }}>
       {children}
     </AuthContext.Provider>
   );

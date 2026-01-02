@@ -7,126 +7,154 @@ const router = express.Router();
 
 // GET cart
 router.get("/", async (req, res) => {
-  //  check is user has the guesId or not 
-   let guestId =  req.signedCookies.guestId;
+  const sid = req.signedCookies.sid;
+  if (!sid) return res.json([]);
 
-   if(!guestId){
-    return res.json([])
-   }
+  const session = await Session.findById(sid);
 
-  // now find in the cart 
-   const cart = await Cart.findOne({ guestId }).populate("courses.courseId");
+  if (session.userId) {
+    const cart = await Cart.findOne({ userId: session.userId })
+      .populate("courses.courseId");
+    return res.json(cart?.courses || []);
+  }
 
-   if (!cart) return res.json([]);
-
-   res.json(cart.courses);
+  return res.json(session.data.cart || []);
 });
+
 
 // Add to cart
 router.post("/", async (req, res) => {
+  const { courseId } = req.body;
+  let session = await Session.findById(req.signedCookies.sid);
 
-  try {
-    const {courseId}= req.body // receive from froentedn
-
-  //  check is user has the guesId or not 
-   let guestId =  req.signedCookies.guestId;
-
-  // 1️⃣ if guest id not present means we have to create new guest session
-   if(!guestId){
-    const session = await Session.create({expires: new Date(Date.now() + 60*60 *1000)  // 1 hour
-    })
-    guestId = session._id.toString(); // update the guestId  and send to frontend
-
-    // as we create new session we send in cookies to frontend
-    res.cookie('guestId',guestId,{
-      httpOnly: true,
-      maxAge:60 * 60 * 1000,
-      sameSite: "lax",
-      signed: true
-    })
+  if (!session) {
+    session = await Session.create({});
+    res.cookie("sid", session._id, { httpOnly: true, signed: true });
   }
 
-  // 2️⃣ now finding the guestId cart Data
-  let cart = await Cart.findOne({guestId})
+  if (session.userId) {
+    // user cart
+    let cart = await Cart.findOne({ userId: session.userId });
+    if (!cart) cart = await Cart.create({ userId: session.userId, courses: [] });
 
-  // if no cart then we create new cart and add courseId to it 
-  if(!cart){
-   cart = await Cart.create({
-      guestId, 
-      courses:[{courseId, quantity: 1}],
-    })
-  }else{
-    //  we going to check the courseId is present in array then we not add else we add
-    const item = cart.courses.find((c)=>c.courseId.toString()=== courseId)
+    const item = cart.courses.find(i => i.courseId.toString() === courseId);
+    if (item) item.quantity++;
+    else cart.courses.push({ courseId, quantity: 1 });
 
-    if(item){
-      item.quantity += 1; // increase the item quantity
-    }else{
-      cart.courses.push({ courseId, quantity: 1 })
-    }
+    await cart.save();
+    return res.json(cart.courses);
   }
-  await cart.save();
-  return res.status(200).json({
-  message: "Added to cart",
-  cart,})
-  } catch (error) {
-      console.log(error.message)
-      return res.json(error.message)
-  }
-   
+
+  // guest cart
+  const item = session.data.cart.find(i => i.courseId.toString() === courseId);
+  if (item) item.quantity++;
+  else session.data.cart.push({ courseId, quantity: 1 });
+
+  await session.save();
+  res.json(session.data.cart);
 });
+
 
 // Remove course from cart
 router.delete("/:courseId", async (req, res) => {
-  // first we check is there present a guestid or not 
-  let guestId = req.signedCookies.guestId
+  try {
+    const { courseId } = req.params;
+    const sid = req.signedCookies.sid;
 
-  //  take the coursId through params
-  const {courseId} = req.params
-
-  // if not guestId 
-  if(!guestId) return res.json({message: "404 Errror Session Not found", success: false})
-
-  // now we find guestId in our Cart is present or not
-  const cartData = await Cart.findOne({guestId})
-
-     if (!cartData) {
-      return res.status(404).json({
+    if (!sid) {
+      return res.status(401).json({
         success: false,
-        message: "Cart not found",
+        message: "Session not found",
       });
     }
 
-  // now we remove the courseId from the courses 
-  const item = cartData.courses.find((item)=>item.courseId.toString() === courseId)
-
-  if(!item){
-    return res.status(404).json({
+    const session = await Session.findById(sid);
+    if (!session) {
+      return res.status(401).json({
         success: false,
-        message: "Item not in cart",
+        message: "Invalid session",
       });
-  }
+    }
 
+    // ============================
+    // 🔵 LOGGED-IN USER CART
+    // ============================
+    if (session.userId) {
+      const cart = await Cart.findOne({ userId: session.userId });
 
-  // otherwise if find the course Id that we wnat to remove
+      if (!cart) {
+        return res.status(404).json({
+          success: false,
+          message: "Cart not found",
+        });
+      }
+
+      const item = cart.courses.find(
+        (i) => i.courseId.toString() === courseId
+      );
+
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: "Item not in cart",
+        });
+      }
+
       if (item.quantity > 1) {
+        item.quantity -= 1;
+      } else {
+        cart.courses = cart.courses.filter(
+          (i) => i.courseId.toString() !== courseId
+        );
+      }
+
+      await cart.save();
+
+      return res.json({
+        success: true,
+        message: "Item removed",
+        cart: cart.courses,
+      });
+    }
+
+    // ============================
+    // 🟡 GUEST CART (SESSION)
+    // ============================
+    const item = session.data.cart.find(
+      (i) => i.courseId.toString() === courseId
+    );
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not in guest cart",
+      });
+    }
+
+    if (item.quantity > 1) {
       item.quantity -= 1;
     } else {
-      cartData.courses = cartData.courses.filter(
+      session.data.cart = session.data.cart.filter(
         (i) => i.courseId.toString() !== courseId
       );
     }
 
-    await cartData.save()
-    
-    console.log("removed")
-    return res.status(200).json({
+    await session.save();
+
+    return res.json({
       success: true,
       message: "Item removed",
-      cart:cartData,
+      cart: session.data.cart,
     });
-
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 });
+
 
 // Clear cart
 router.delete("/", async (req, res) => {
@@ -134,15 +162,6 @@ router.delete("/", async (req, res) => {
 });
 
 export default router;
-
-
-
-
-
-
-
-
-
 
 
 

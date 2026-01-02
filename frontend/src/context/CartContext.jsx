@@ -1,68 +1,47 @@
-
 import { createContext, useContext, useState } from "react";
 import axiosInstance from "../api/axiosInstance";
-
 
 const CartContext = createContext(undefined);
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
 
-
-
-
-  // cart data fetch fro backedn 
-const loadCart = async () => {
+  // 🔹 Load cart (single source of truth)
+  const loadCart = async () => {
     const { data } = await axiosInstance.get("/cart");
-    
+
     const formatted = data.map((item) => ({
       ...item.courseId,
       quantity: item.quantity,
     }));
-    
+
     setCart(formatted);
   };
 
+  // 🔹 Add item
+  const addToCart = async (course) => {
+    await axiosInstance.post("/cart", {
+      courseId: course._id,
+    });
 
+    await loadCart(); // 🔥 ONLY THIS
+  };
 
-
-const addToCart = async (course) => {
-  await axiosInstance.post("/cart", {
-    courseId: course._id,
-  });
-
-  setCart((prev) => {
-    const exists = prev.find((i) => i._id === course._id);
-    if (exists) {
-      return prev.map((i) =>
-        i._id === course._id ? { ...i, quantity: i.quantity + 1 } : i
-      );
-    }
-    return [...prev, { ...course, quantity: 1 }];
-  });
-
-  await loadCart()
-};
-
-
+  // 🔹 Remove item
   const removeFromCart = async (course) => {
-    const {data} = await axiosInstance.delete(`/cart/${course._id}`);
-    const formatted = data.cart.courses.map((item) => ({
-    ...item.courseId,
-    quantity: item.quantity,
-  }));
+    await axiosInstance.delete(`/cart/${course._id}`);
 
-  setCart(formatted);
+    await loadCart(); // 🔥 ONLY THIS
   };
 
   const cartCount = cart.reduce(
-    (total, item) => total + (item.quantity || 1),
+    (total, item) => total + item.quantity,
     0
   );
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, removeFromCart, cartCount, setCart, loadCart }}
+      value={{ cart, addToCart, removeFromCart, cartCount, loadCart }}
     >
       {children}
     </CartContext.Provider>
@@ -71,7 +50,7 @@ const addToCart = async (course) => {
 
 export function useCart() {
   const context = useContext(CartContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useCart must be used within a CartProvider");
   }
   return context;
