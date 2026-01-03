@@ -58,7 +58,7 @@ router.post("/login", async (req, res) => {
     : null;
 
   if (!session) {
-    session = await Session.create({});
+    session = await Session.create({expires : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)});
   }
 
   // 2️⃣ Attach user to session
@@ -129,6 +129,7 @@ router.delete("/logout", async (req, res) => {
     // 1️⃣ Detach user from session
     session.userId = null;
     session.data.cart = []; // optional (Amazon clears temp cart)
+    session.deleteOne(sid)
     await session.save();
 
     // 2️⃣ Remove auth token

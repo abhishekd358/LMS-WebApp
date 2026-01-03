@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
     );
 
     return {
-      courseId: course, // 🔥 same shape as logged-in cart
+      courseId: course, //  same shape as logged-in cart
       quantity: item.quantity,
     };
   });
@@ -45,10 +45,10 @@ router.get("/", async (req, res) => {
 // Add to cart
 router.post("/", async (req, res) => {
   const { courseId } = req.body;
-  let session = await Session.findById(req.signedCookies.sid);
+  let session = await Session.findById(req.signedCookies.psid);
 
   if (!session) {
-    session = await Session.create({});
+    session = await Session.create({expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)});
     res.cookie("sid", session._id, { httpOnly: true, signed: true });
   }
 
@@ -191,3 +191,4 @@ export default router;
 
 
 // 1 user - courses if from body 
+
