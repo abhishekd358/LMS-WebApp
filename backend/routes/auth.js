@@ -58,7 +58,7 @@ router.post("/login", async (req, res) => {
     : null;
 
   if (!session) {
-    session = await Session.create({expires : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)});
+    session = await Session.create({expires : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)});
   }
 
   // 2️⃣ Attach user to session
